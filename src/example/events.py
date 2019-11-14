@@ -1,6 +1,6 @@
 from decimal import Decimal
 from nameko.standalone.events import event_dispatcher
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.core import serializers
 import json
 import datetime
@@ -27,7 +27,7 @@ class DateTimeDecimalEncoder(json.JSONEncoder):
 encoder = DateTimeDecimalEncoder()
 
 
-def create_signal_handler(synced_save_model, sender_name):
+def create_save_signal_handler(synced_save_model, sender_name):
     def handler(sender, instance, created, **kwargs):
         payload = serializers.serialize("python", [instance, ])[0]
         payload = encoder.encode(payload)
@@ -35,7 +35,17 @@ def create_signal_handler(synced_save_model, sender_name):
     return handler
 
 
+def create_delete_signal_handler(synced_save_model, sender_name):
+    def handler(sender, instance, created, **kwargs):
+        payload = serializers.serialize("python", [instance, ])[0]
+        payload = encoder.encode(payload)
+        dispatch(sender_name, f'{synced_save_model.__name__}_deleted', payload)
+    return handler
+
+
 def connect_signals(models, sender_name):
     for synced_save_model in models:
-        signal_handler = create_signal_handler(synced_save_model, sender_name)
-        post_save.connect(signal_handler, sender=synced_save_model, weak=False)
+        save_signal_handler = create_save_signal_handler(synced_save_model, sender_name)
+        delete_signal_handler = create_delete_signal_handler(synced_save_model, sender_name)
+        post_save.connect(save_signal_handler, sender=synced_save_model, weak=False)
+        post_delete.connect(delete_signal_handler, sender=synced_save_model, weak=False)

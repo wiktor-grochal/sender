@@ -36,7 +36,7 @@ def create_save_signal_handler(synced_save_model, sender_name):
 
 
 def create_delete_signal_handler(synced_save_model, sender_name):
-    def handler(sender, instance, created, **kwargs):
+    def handler(sender, instance, **kwargs):
         payload = serializers.serialize("python", [instance, ])[0]
         payload = encoder.encode(payload)
         dispatch(sender_name, f'{synced_save_model.__name__}_deleted', payload)
